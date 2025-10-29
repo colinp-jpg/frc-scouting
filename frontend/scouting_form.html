@@ -6,7 +6,7 @@
   <title>FRC Scouting — Visual Reef</title>
 
   <!-- QR library (works offline if loaded once; CDN recommended for dev) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
 
   <style>
     :root{
@@ -131,6 +131,19 @@
         <label style="margin-top:10px">Notes</label>
         <textarea id="notes" rows="3" placeholder="Quick notes..."></textarea>
 
+        <label style="margin-top:10px">Auto</label>
+        <div class="counter-row" style="margin-top:6px">
+          <div class="counter-left">
+            <div class="counter-title">Auto Peices</div>
+            <div class="small">Peices scored in autonomous</div>
+          </div>
+          <div class="counter-controls">
+            <button class="btn secondary" onclick="decrement('auto')">−</button>
+            <div class="num" id="auto">0</div>
+            <button class="btn" onclick="increment('auto')">+</button>
+          </div>
+        </div>
+
         <div style="height:12px"></div>
 
         <div class="reef-area">
@@ -242,7 +255,7 @@
 
 <script>
   // initial counts
-  const counts = { l4:0, l3:0, l2:0, l1:0, barge:0, processor:0 };
+  const counts = { l4:0, l3:0, l2:0, l1:0, barge:0, processor:0, auto:0 };
 
   function setDisplay(id){
     document.getElementById(id).textContent = counts[id];
@@ -275,6 +288,7 @@
         L2: counts.l2,
         L1: counts.l1
       },
+      auto_peices: counts.auto,
       barge_algae: counts.barge,
       processor_count: counts.processor,
       notes: notes
@@ -296,17 +310,23 @@
     const qrContainer = document.getElementById('qrcode');
     qrContainer.innerHTML = '';
 
-    // generate QR canvas
+    // generate QR code
     const jsonStr = JSON.stringify(data);
-    // Only generate QR if length isn't excessive; it should be fine here.
-    QRCode.toCanvas(jsonStr, { width: 240 }, function(err, canvas){
-      if (err) {
-        console.error(err);
-        alert('QR generation failed: ' + err);
-        return;
-      }
-      qrContainer.appendChild(canvas);
-    });
+    // Create QR code
+    try {
+      // Create a new QR code instance
+      const qr = new QRCode(qrContainer, {
+        text: jsonStr,
+        width: 240,
+        height: 240,
+        colorDark: "#000000",
+        colorLight: "#ffffff"
+      });
+    } catch (err) {
+      console.error(err);
+      alert('QR generation failed: ' + err);
+      return;
+    }
   }
 
   function downloadJSON(){

@@ -1,39 +1,157 @@
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify
 import json
 from datetime import datetime
 import os
+# Optional native dependencies for server-side QR decoding.
+# Wrap imports so the Flask app can still start when these native
+# libraries (zbar/libiconv) are not available on Windows.
+try:
+    import cv2
+    from pyzbar.pyzbar import decode
+    import numpy as np
+except Exception as e:
+    cv2 = None
+    decode = None
+    np = None
+    # Log to console so user sees why server-side decoding may not work
+    print('Warning: native QR decoding dependencies not available:', e)
+import pandas as pd
+import base64
 
 app = Flask(__name__)
 
-# Ensure the data directory exists
+# Ensure the data directories exist
 DATA_DIR = "collected_data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+CSV_DIR = os.path.join(DATA_DIR, "csv")
+JSON_DIR = os.path.join(DATA_DIR, "json")
+for d in [DATA_DIR, CSV_DIR, JSON_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d)
 
-@app.route('/', methods=['GET'])
+# Keep track of processed data
+processed_data = []
+
+def save_to_csv():
+    """Convert all JSON data to CSV"""
+    if not processed_data:
+        return "No data to convert"
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(processed_data)
+    
+    # Generate CSV filename with timestamp
+    csv_filename = f"scouting_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    csv_path = os.path.join(CSV_DIR, csv_filename)
+    
+    # Save to CSV
+    df.to_csv(csv_path, index=False)
+    return f"Data saved to {csv_filename}"
+
+@app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/submit', methods=['POST'])
-def submit_data():
+@app.route('/scan', methods=['POST'])
+def scan_qr():
     try:
-        # Get form data
-        data = request.form.to_dict()
+        # Get the image data from the request
+        image_data = request.json.get('image')
+        if not image_data:
+            return jsonify({"error": "No image data received"}), 400
         
-        # Add timestamp
-        data['timestamp'] = datetime.now().isoformat()
+        # Remove the data URL prefix if present
+        if 'base64,' in image_data:
+            image_data = image_data.split('base64,')[1]
         
-        # Generate unique filename
-        filename = f"{DATA_DIR}/scout_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        # Decode base64 image
+        img_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
         
-        # Save data to JSON file
-        with open(filename, 'w') as f:
-            json.dump(data, f, indent=4)
+        # Scan for QR codes
+        qr_codes = decode(img)
+        
+        if not qr_codes:
+            return jsonify({"error": "No QR code found"}), 404
+        
+        # Process each QR code found
+        results = []
+        for qr in qr_codes:
+            try:
+                # Decode QR data
+                data = json.loads(qr.data.decode('utf-8'))
+                
+                # Save JSON file
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                json_filename = f"scout_data_{data.get('team', 'unknown')}_{data.get('match', 'unknown')}_{timestamp}.json"
+                json_path = os.path.join(JSON_DIR, json_filename)
+                
+                with open(json_path, 'w') as f:
+                    json.dump(data, f, indent=2)
+                
+                # Add to processed data
+                processed_data.append(data)
+                
+                results.append({
+                    "status": "success",
+                    "message": f"Data saved to {json_filename}",
+                    "data": data
+                })
             
-        return "Data submitted successfully!", 200
+            except json.JSONDecodeError:
+                results.append({
+                    "status": "error",
+                    "message": "Invalid JSON data in QR code"
+                })
+        
+        # Save updated CSV
+        csv_message = save_to_csv()
+        
+        return jsonify({
+            "message": "QR code(s) processed successfully",
+            "results": results,
+            "csv_status": csv_message
+        })
     
     except Exception as e:
-        return f"Error saving data: {str(e)}", 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/data')
+def view_data():
+    """View all processed data"""
+    return jsonify(processed_data)
+
+
+@app.route('/submit_json', methods=['POST'])
+def submit_json():
+    """Accept decoded JSON payloads from clients (browser-side decoding).
+    Saves the JSON, appends to processed_data and updates CSVs.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON payload received"}), 400
+
+        # Save JSON file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        json_filename = f"scout_data_{data.get('team', 'unknown')}_{data.get('match', 'unknown')}_{timestamp}.json"
+        json_path = os.path.join(JSON_DIR, json_filename)
+
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        # Add to processed data and update CSV
+        processed_data.append(data)
+        csv_message = save_to_csv()
+
+        return jsonify({
+            "message": f"Data saved to {json_filename}",
+            "data": data,
+            "csv_status": csv_message
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

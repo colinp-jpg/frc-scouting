@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRC Scouting Hub - QR Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #video-container {
+            width: 100%;
+            max-width: 640px;
+            margin: 20px auto;
+        }
+        #video {
+            width: 100%;
+            border-radius: 8px;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        #data-list {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .data-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FRC Scouting Hub - QR Scanner</h1>
+        
+        <div id="video-container">
+            <video id="video" playsinline></video>
+            <button id="start-camera">Start/Stop Camera</button>
+            <canvas id="canvas" style="display:none;"></canvas>
+        </div>
+
+        <div id="result"></div>
+        
+        <div id="data-list">
+            <h2>Scanned Data</h2>
+            <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+            <script>
+                let video = document.getElementById('video');
+                let canvas = document.getElementById('canvas');
+                let context = canvas.getContext('2d');
+                let resultDiv = document.getElementById('result');
+                let dataList = document.getElementById('scanned-data');
+                let scanning = false;
+                let lastScanned = new Set(); // Keep track of recently scanned codes
+                let scanTimeout = null;
+
+                // Function to process a frame with client-side decoding (jsQR)
+                async function processFrame() {
+                    if (!scanning) return;
+
+                    // Set canvas size to match video
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+            
+                    // Draw video frame to canvas
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    // Get raw pixel data and decode locally using jsQR
+                    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+                    try {
+                        const qr = jsQR(frame.data, frame.width, frame.height);
+                        if (qr && qr.data) {
+                            // Attempt to parse payload as JSON
+                            let payload = null;
+                            try {
+                                payload = JSON.parse(qr.data);
+                            } catch (e) {
+                                // Not JSON — ignore or show as raw text
+                                console.warn('QR data not JSON:', qr.data);
+                            }
+
+                            if (payload) {
+                                const qrContent = JSON.stringify(payload);
+                                if (!lastScanned.has(qrContent)) {
+                                    lastScanned.add(qrContent);
+
+                                    // Send decoded JSON to server
+                                    const resp = await fetch('/submit_json', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(payload)
+                                    });
+
+                                    const serverResult = await resp.json();
+
+                                    if (!serverResult.error) {
+                                        // Add visual feedback
+                                        const div = document.createElement('div');
+                                        div.className = 'data-item';
+                                        div.textContent = `Team ${payload.team} - Match ${payload.match}`;
+                                        dataList.insertBefore(div, dataList.firstChild);
+
+                                        // Play a success sound
+                                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF5WHhcYFhQODRIYNkhwj6yxtbK0ubm1rZ2GcmZSTT0yMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMv//MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjI=');
+                                        audio.play();
+
+                                        resultDiv.innerHTML = `Success! ${serverResult.message} ${serverResult.csv_status || ''}`;
+                                        resultDiv.className = 'success';
+                                    } else {
+                                        resultDiv.innerHTML = `Server error: ${serverResult.error}`;
+                                        resultDiv.className = 'error';
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Decoding error:', error);
+                    }
+
+                    // Continue scanning
+                    if (scanning) {
+                        scanTimeout = setTimeout(processFrame, 1000); // Scan every second
+                    }
+                }
+
+        // Toggle camera button
+        document.getElementById('start-camera').addEventListener('click', async () => {
+            if (scanning) {
+                // Stop scanning
+                scanning = false;
+                if (scanTimeout) {
+                    clearTimeout(scanTimeout);
+                }
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                video.srcObject = null;
+                resultDiv.innerHTML = "Camera stopped";
+                resultDiv.className = '';
+            } else {
+                // Start scanning
+                try {
+                    // Feature detection: some browsers (esp. iOS over HTTP) don't expose getUserMedia
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        resultDiv.innerHTML = 'Camera not available: your browser does not expose getUserMedia. On iOS you must open this page over HTTPS (or use an HTTPS tunnel like ngrok) and use Safari 11+.';
+                        resultDiv.className = 'error';
+                        return;
+                    }
+
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: { ideal: 'environment' } }
+                    });
+
+                    // Some older WebKit builds don't support srcObject — use fallback
+                    if ('srcObject' in video) {
+                        video.srcObject = stream;
+                    } else {
+                        // Deprecated createObjectURL fallback
+                        video.src = (window.URL || window.webkitURL).createObjectURL(stream);
+                    }
+
+                    // Ensure inline playback attributes for iOS
+                    video.setAttribute('playsinline', '');
+                    video.setAttribute('webkit-playsinline', '');
+
+                    // Play and start scanning
+                    await video.play();
+                    scanning = true;
+                    lastScanned.clear(); // Clear the scanned codes list
+                    processFrame(); // Start the scanning process
+                    resultDiv.innerHTML = "Camera started - looking for QR codes...";
+                    resultDiv.className = '';
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    // Show a friendly message rather than a cryptic undefined error
+                    resultDiv.innerHTML = `Error accessing camera: ${err && err.message ? err.message : err}. If you're on an iPhone, make sure you opened the page via HTTPS (use ngrok or local TLS) and use Safari.`;
+                    resultDiv.className = 'error';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
