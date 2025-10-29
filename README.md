@@ -18,7 +18,11 @@ structure:
       scouting_form.html   # Main UI for data entry and QR generation
     hub/
       main.py              # Backend for data collection
+    certs/                 # HTTPS certificates (generated locally)
+      localhost.pem
+      localhost-key.pem
     data/                  # Stored scouting data
+    setup_certs.py        # Certificate generation script
     requirements.txt
     README.md
     .gitignore
@@ -31,24 +35,46 @@ features:
   - Hub for data aggregation and export
 
 setup:
-  - Clone repository:
+  1. Clone repository:
       git clone https://github.com/cp3277/frc-qr-scouting-app.git
       cd frc-qr-scouting-app
 
-  - Create and activate virtual environment:
-      python -m venv venv
-      .\venv\Scripts\activate        # Windows
-      source venv/bin/activate       # macOS/Linux
+  2. Install mkcert (required for HTTPS/camera access):
+     Windows (using Chocolatey):
+       choco install mkcert
+     
+     Windows (manual):
+       - Download from https://github.com/FiloSottile/mkcert/releases
+       - Add the executable to your PATH
 
-  - Install dependencies:
-      pip install -r requirements.txt
+  3. Create and activate virtual environment:
+     Windows:
+       python -m venv venv
+       .\venv\Scripts\Activate.ps1
 
-  - Run frontend:
-      Open frontend/scouting_form.html in a browser
-      (Optional: use VS Code Live Server for auto-reload)
+     macOS/Linux:
+       python -m venv venv
+       source venv/bin/activate
 
-  - Run backend hub:
-      python hub/main.py
+  4. Install dependencies:
+       pip install -r requirements.txt
+
+  5. Setup HTTPS certificates:
+       python setup_certs.py
+     This will:
+     - Install local Certificate Authority
+     - Generate certificates in ./certs directory
+     - Configure Flask to use the certificates
+     - Update .gitignore if needed
+
+  6. Run the application:
+     Start the backend hub:
+       python hub/main.py
+     
+     Access the scouting form:
+     - On hub device: https://localhost:5000
+     - On other devices: https://<hub-ip>:5000
+       (Accept the security certificate when prompted)
 
 tech_stack:
   frontend: HTML, CSS, JavaScript
@@ -58,15 +84,20 @@ tech_stack:
   version_control: Git
 
 security_notes:
-  certificates:
-    - For HTTPS/camera access, generate local certificates using mkcert:
-        mkcert -install
-        mkcert localhost 127.0.0.1 192.168.0.16
-    - Certificate files (*.pem) are NOT included in the repo
-    - Keep generated certificates secure and never commit them
-    - Required files (generate these locally):
-        localhost+2.pem
-        localhost+2-key.pem
+  https_certificates:
+    - Certificates are required for HTTPS and camera access
+    - Generated automatically by setup_certs.py using mkcert
+    - Stored in ./certs directory (not tracked by git)
+    - Never commit certificate files to the repository
+    - Files generated:
+        certs/localhost.pem
+        certs/localhost-key.pem
+    
+  first_time_setup:
+    - Run setup_certs.py to generate certificates
+    - Accept the certificate in your browser
+    - For iOS devices, install the root CA:
+      Settings -> General -> About -> Certificate Trust Settings
 
 gitignore:
   - venv/

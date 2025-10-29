@@ -1,12 +1,19 @@
 reef.png
 reef_base64.txt
 
-# Certificate files and private keys
+# Certificate files and directories
+certs/
 *.pem
 *.key
 *.crt
 *.cert
-install-key.pem
-install.pem
-localhost+2-key.pem
-localhost+2.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Data
+collected_data/
