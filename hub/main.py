@@ -7,6 +7,10 @@ import pandas as pd
 from dotenv import load_dotenv
 import psycopg2
 from groq import Groq
+import subprocess
+import threading
+import time
+import requests
 
 # Optional native dependencies for server-side QR decoding.
 try:
@@ -328,7 +332,20 @@ def ask():
     response = ask_groq(question)
     return jsonify(response)
 
-
+def start_ngrok():
+    time.sleep(2)
+    try:
+        subprocess.run(['ngrok', 'http', '5000'], check=True)
+        time.sleep(3)
+        try:
+            tunnel_data = requests.get("http://localhost:4040/api/tunnels").json()
+            public_url = tunnel_data['tunnels'][0]['public_url']
+            print(public_url)
+        except Exception as e:
+            print(e) 
+    except FileNotFoundError:
+        print("ngrok not found please install and add to PATH")
+threading.Thread(target=start_ngrok, daemon=True).start()
 if __name__ == '__main__':
     ssl_context = ('certs/localhost.pem', 'certs/localhost-key.pem')
-    app.run(host='0.0.0.0', port=5000, debug=True, ssl_context=ssl_context)
+    app.run(host='0.0.0.0', port=5000, debug=True)
