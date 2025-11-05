@@ -2,7 +2,6 @@ from flask import Flask, request, render_template, jsonify
 import json
 from datetime import datetime
 import os
-import base64
 import pandas as pd
 from dotenv import load_dotenv
 import psycopg2
@@ -12,17 +11,6 @@ import threading
 import time
 import requests
 import atexit
-
-# Optional native dependencies for server-side QR decoding.
-try:
-    import cv2
-    from pyzbar.pyzbar import decode
-    import numpy as np
-except Exception as e:
-    cv2 = None
-    decode = None
-    np = None
-    print('Warning: native QR decoding dependencies not available:', e)
 
 # --- Load environment variables ---
 load_dotenv()
@@ -272,43 +260,6 @@ def append_to_csv(record: dict):
         return f"Appended to {os.path.basename(CURRENT_CSV)}"
     except Exception as e:
         return f"Failed to append: {e}"
-
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-
-@app.route('/scan', methods=['POST'])
-def scan_qr():
-    try:
-        image_data = request.json.get('image')
-        if not image_data:
-            return jsonify({"error": "No image data received"}), 400
-        if 'base64,' in image_data:
-            image_data = image_data.split('base64,')[1]
-        img_bytes = base64.b64decode(image_data)
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
-        qr_codes = decode(img)
-        if not qr_codes:
-            return jsonify({"error": "No QR code found"}), 404
-
-        results = []
-        for qr in qr_codes:
-            data = json.loads(qr.data.decode('utf-8'))
-            normalized = normalize_record(data)
-            processed_data.append(normalized)
-            csv_status = append_to_csv(normalized)
-            results.append({
-                "status": "success",
-                "csv_status": csv_status,
-                "data": normalized
-            })
-        return jsonify({"message": "QR processed", "results": results})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 
 @app.route('/submit_json', methods=['POST'])
 def submit_json():

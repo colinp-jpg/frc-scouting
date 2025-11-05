@@ -261,6 +261,22 @@
           <label class="small">Last JSON (preview)</label>
           <pre id="jsonPreview" style="white-space:pre-wrap;background:#fbfbff;padding:8px;border-radius:8px;border:1px solid #f1f1f6;height:180px;overflow:auto"></pre>
         </div>
+
+        <div id="ai-container" style="margin-top: 40px; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+         <h2 style="margin-bottom: 10px;">🤖 Ask AI About Scouting Data</h2>
+
+         <div style="display: flex; gap: 10px;">
+          <input id="ai-question" type="text" placeholder="Example: Which team scored the most coral?" 
+           style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px;">
+          <button id="ai-submit" 
+            style="padding: 10px 20px; background-color: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer;">
+      Ask
+    </button>
+  </div>
+
+  <div id="ai-loading" style="display: none; margin-top: 10px; color: #666;">Thinking...</div>
+  <div id="ai-result" style="margin-top: 15px; white-space: pre-wrap;"></div>
+</div>
       </div>
     </div>
   </div>
@@ -378,21 +394,6 @@
   for (let k in counts) setDisplay(k);
 </script>
 <!-- AI Query Section -->
-<div id="ai-container" style="margin-top: 40px; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-  <h2 style="margin-bottom: 10px;">🤖 Ask AI About Scouting Data</h2>
-
-  <div style="display: flex; gap: 10px;">
-    <input id="ai-question" type="text" placeholder="Example: Which team scored the most coral?" 
-           style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px;">
-    <button id="ai-submit" 
-            style="padding: 10px 20px; background-color: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer;">
-      Ask
-    </button>
-  </div>
-
-  <div id="ai-loading" style="display: none; margin-top: 10px; color: #666;">Thinking...</div>
-  <div id="ai-result" style="margin-top: 15px; white-space: pre-wrap;"></div>
-</div>
 
 <script>
 document.getElementById("ai-submit").addEventListener("click", async () => {
