@@ -112,6 +112,25 @@
     }
   </style>
 </head>
+<style>
+    /* Styles for the new AI data table */
+    .ai-data-table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .ai-data-table th, .ai-data-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .ai-data-table th {
+      background-color: #f2f2f2;
+      font-weight: 600;
+    }
+  </style>
+  </head>
 <body>
   <div class="wrap">
     <h1>FRC Scouting — Reef / Barge / Processor</h1>
@@ -389,9 +408,51 @@
     document.getElementById('qrcode').innerHTML = '';
     document.getElementById('jsonPreview').textContent = '';
   }
+/**
+   * Creates an HTML table from an array of data objects.
+   * @param {Array<Object>} dataArray - The array of data from the AI response.
+   * @returns {string} - The HTML string for the table.
+   */
+  function createTable(dataArray) {
+    if (!dataArray || dataArray.length === 0) {
+      return ""; // AI summary will explain, so we return empty
+    }
+    let html = '<div style="overflow-x: auto; width: 100%; border: 1px solid #eee;">';
+    html += '<table class="ai-data-table">';
+    const headers = Object.keys(dataArray[0]);
+    html += '<thead><tr>';
+    headers.forEach(header => {
+      // This makes headers "Reef L4" instead of "reef_l4"
+      let cleanHeader = header.replace(/_/g, ' ');
+      cleanHeader = cleanHeader.charAt(0).toUpperCase() + cleanHeader.slice(1);
+      html += `<th>${cleanHeader}</th>`;
+    });
+    html += '</tr></thead>';
+    html += '<tbody>';
+    dataArray.forEach(row => {
+      html += '<tr>';
+      headers.forEach(header => {
+        let cellValue = row[header] !== null ? row[header] : '';
+        
+        // Check if the value is a number and has a decimal part
+        if (typeof cellValue === 'number' && !Number.isInteger(cellValue)) {
+          cellValue = cellValue.toFixed(2); // Round to 2 decimal places
+        }
+        html += `<td>${row[header] !== null ? row[header] : ''}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    
+    // --- FIX: Close the wrapper div ---
+    html += '</div>';
+
+    return html;
+  }
 
   // initialize display
   for (let k in counts) setDisplay(k);
+</script>
 </script>
 <!-- AI Query Section -->
 
@@ -400,13 +461,13 @@ document.getElementById("ai-submit").addEventListener("click", async () => {
   const question = document.getElementById("ai-question").value.trim();
   const resultDiv = document.getElementById("ai-result");
   const loading = document.getElementById("ai-loading");
-  
+
   if (!question) {
     resultDiv.innerText = "Please enter a question.";
     return;
   }
 
-  resultDiv.innerText = "";
+  resultDiv.innerHTML = ""; // Clear previous results
   loading.style.display = "block";
 
   try {
@@ -420,12 +481,26 @@ document.getElementById("ai-submit").addEventListener("click", async () => {
     loading.style.display = "none";
 
     if (data.error) {
-      resultDiv.innerText = "⚠️ Error: " + data.error;
-    } else {
+      // This provides better error info
       resultDiv.innerHTML = `
-        <b>SQL Query:</b><br><code>${data.query}</code><br><br>
-        <b>AI Summary:</b><br>${data.summary || "No summary available."}
+        <b>⚠️ AI Error:</b><br>${data.error}<br><br>
+        <b>Query Attempted:</b><br><code>${data.query}</code>
       `;
+    } else {
+      // --- THIS IS THE UPGRADE ---
+
+      // 1. Create the table (it will return "" if data is empty)
+      const tableHtml = createTable(data.data);
+
+      // 2. Display summary, data table, and query
+      resultDiv.innerHTML = `
+        <b>AI Summary:</b><br>${data.summary || "No summary available."}
+        <br><br>
+        ${tableHtml ? `<b>Data Result:</b><br>${tableHtml}<br><br>` : ''}
+        <b>SQL Query Used:</b><br>
+        <code>${data.query}</code>
+      `;
+      // --- END UPGRADE ---
     }
   } catch (err) {
     loading.style.display = "none";

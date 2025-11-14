@@ -56,7 +56,6 @@ def ask_groq(question: str):
     client = Groq(api_key=GROQ_API_KEY)
 
     # Step 1: Generate SQL
-    # Step 1: Generate SQL
     prompt = f"""
     CRITICAL: Output ONLY the SQL query. Do NOT include any explanations, markdown formatting (like ```sql), or other text.
     You are a data analyst for an FRC team. Given a user question, output a valid PostgreSQL SQL query 
@@ -78,7 +77,13 @@ def ask_groq(question: str):
         notes TEXT
     );
 
-    # --- NEW: CRITICAL LOGIC MAPPING RULE for Consistency ---
+    # --- NEW: CRITICAL LOGIC MAPPING RULE for Rounding ---
+    # When calculating an `AVG` or any other division that results in a decimal,
+    # you MUST round the result to 2 decimal places using `ROUND(..., 2)`.
+    # Example: `ROUND(AVG(total_points), 2) AS average_points`
+    # ----------------------------------------------------
+
+    # --- CRITICAL LOGIC MAPPING RULE for Consistency ---
     # When a user asks for "consistency", "reliability", or "predictability", you MUST use the statistical RANGE (MAX - MIN).
     # 1. "Consistency" is the difference between a team's best (MAX) and worst (MIN) performance for a metric.
     # 2. A SMALLER range (difference) is BETTER and means HIGHER consistency.
@@ -88,20 +93,13 @@ def ask_groq(question: str):
     # Example: To find the "most consistent team" by total points:
     #   -- First, define the total_points calculation
     #   WITH TeamPoints AS (
-    #     SELECT
-    #       team,
-    #       match,
-    #       ( (reef_L4 * 5) + (reef_L3 * 3) + (reef_L2 * 2) + (reef_L1 * 1) + 
-    #         (auto_peices * 3) + (barge_algae * 2) + (processor_count * 2) +
-    #         (CASE WHEN climb IN ('shallow', 'deep') THEN 5 ELSE 0 END)
+    *REMOVED*
     #       ) AS total_points
     #     FROM match_scouting
     #   )
     #   -- Now, find the range for each team
     #   SELECT
-    #     team,
-    #     MAX(total_points) AS max_score,
-    #     MIN(total_points) AS min_score,
+    *REMOVED*
     #     (MAX(total_points) - MIN(total_points)) AS consistency_range
     #   FROM TeamPoints
     #   GROUP BY team
@@ -111,52 +109,41 @@ def ask_groq(question: str):
     
     # --- CRITICAL LOGIC MAPPING RULE for Game Context & KPIs ---
     # 1. GAME PHASES:
-    #    - 'auto_peices' is scored in the AUTONOMOUS period.
-    #    - 'reef_L4', 'reef_L3', 'reef_L2', 'reef_L1', 'barge_algae', and 'processor_count' are scored in the TELEOP period.
-    #    - 'climb' is scored in the ENDGAME period.
-    # 2. TOTAL CORAL: When asked for "total coral" or "reef total", you must sum all levels:
-    #    (reef_L4 + reef_L3 + reef_L2 + reef_L1)
-    # 3. TOTAL ALGAE: When asked for "total algae", you must sum both types:
-    #    (barge_algae + processor_count)
-    # 4. TOTAL PIECES: When asked for "total pieces" or "total game pieces", you must sum all pieces from all periods:
+    *REMOVED*
     #    (auto_peices + reef_L4 + reef_L3 + reef_L2 + reef_L1 + barge_algae + processor_count)
     # 5. NOTES: The 'notes' column contains human observations (e.g., "robot died", "stuck"). Use `LIKE %...%` to find text in this column.
     # ----------------------------------------------------
 
     # --- CRITICAL LOGIC MAPPING RULE for Scoring Points ---
     # When a user asks for "points", "score", or "total value", you MUST calculate it using these point values:
-    # 1. `reef_L4`: 5 points each
-    # 2. `reef_L3`: 4 points each
-    # 3. `reef_L2`: 3 points each
-    # 4. `reef_L1`: 2 point each
-    # 5. `auto_peices`: 7 points each
-    # 6. `barge_algae`: 4 points each
-    # 7. `processor_count`: 6 points each
-    # 8. `climb` ('deep'): 12 points, ('shallow'): 6 points, ('park'): 2 points, ('no_climb' as 0 points)
+    *REMOVED*
+    # 8. `climb`: 'deep' = 12 points, 'shallow' = 6 points, 'park' = 2 points, 'no_climb' = 0 points
     #
     # Example: To find the total points for a team, you would use this SQL calculation:
     # SUM(
     #   (reef_L4 * 5) + (reef_L3 * 4) + (reef_L2 * 3) + (reef_L1 * 2) + 
-    #   (auto_peices * 7) + (barge_algae * 4) + (processor_count * 6) + (deep * 12) + (shallow * 6) + (park * 2)
+    #   (auto_peices * 7) + (barge_algae * 4) + (processor_count * 6) +
+    #   (CASE
+    #       WHEN climb = 'deep' THEN 12
+    #       WHEN climb = 'shallow' THEN 6
+    #       WHEN climb = 'park' THEN 2
+    #       ELSE 0
+    #   END)
     # ) AS total_points
     # ----------------------------------------------------
     
     # --- CRITICAL LOGIC MAPPING RULE for Climb Status ---
-    # When analyzing the 'climb' field:
-    # 1. Any value containing 'shallow' OR 'deep' (e.g., 'shallow', 'deep') **MUST** be treated as a **SUCCESSFUL** climb or endgame action.
-    # 2. All other values ('park', 'no_climb') must be treated as a FAILURE or INCOMPLETE attempt.
+    *REMOVED*
     # 3. When generating the query for success rate, use the PostgreSQL IN operator, for example: `WHERE climb IN ('shallow', 'deep')` 
     # ----------------------------------------------------
     
     # --- CRITICAL QUERY LIMIT INSTRUCTION ---
-    # 1. If the user asks for the 'most' or 'least' of a metric, use ORDER BY on the aggregated column.
-    # 2. **ONLY** use the LIMIT clause (e.g., LIMIT 1 or LIMIT 5) if the user explicitly uses words like 'top 5', 'best team', 'single team', or 'highest'.
+    *REMOVED*
     # 3. If the user asks for a simple aggregated list (e.g., 'all teams' scores' or 'all results'), DO NOT use the LIMIT clause.
     # ------------------------------------------
     
     The user asked: "{question}"
-    Generate a valid, safe SQL SELECT query (PostgreSQL syntax) that retrieves relevant information.
-    If the question asks for the 'most', 'least', 'average', or a total, ensure you use the appropriate aggregation function (SUM, AVG, COUNT, etc.) and use ORDER BY and LIMIT 1 to isolate the result.
+    *REMOVED*
     Do not include INSERT/DELETE/UPDATE/DROP/ALTER statements.
     """
     completion = client.chat.completions.create(
