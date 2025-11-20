@@ -93,7 +93,6 @@ def ask_groq(question: str):
     # Example: To find the "most consistent team" by total points:
     #   -- First, define the total_points calculation
     #   WITH TeamPoints AS (
-    *REMOVED*
     #       ) AS total_points
     #     FROM match_scouting
     #   )
@@ -114,7 +113,6 @@ def ask_groq(question: str):
 
     # --- CRITICAL LOGIC MAPPING RULE for Scoring Points ---
     # When a user asks for "points", "score", or "total value", you MUST calculate it using these point values:
-    *REMOVED*
     # 8. `climb`: 'deep' = 12 points, 'shallow' = 6 points, 'park' = 2 points, 'no_climb' = 0 points
     #
     # Example: To find the total points for a team, you would use this SQL calculation:
