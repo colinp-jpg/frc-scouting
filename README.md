@@ -3,36 +3,43 @@
 description: >
   A lightweight, local-first scouting system for FIRST Robotics Competition (FRC).
   Scouts record match data, generate QR codes, and send results to a hub device for aggregation.
-  Designed for offline use and later data analysis.
+  Designed for offline use and later data analysis with AI-powered insights.
 
 overview:
-  - Scouts open the local web page (frontend/scouting_form.html) on a phone or tablet.
-  - They record scoring actions using a reef image and simple count fields.
-  - The page encodes data into a QR code for scanning.
-  - A hub device scans or imports the QR to aggregate match data.
-  - Collected data is stored for later analysis or export.
+  - Scouts can use two methods to record data:
+    1. Desktop/Tablet: Fill out the scouting form (frontend.html) and generate QR codes
+    2. Mobile: Scan QR codes directly using the QR scanner page
+  - A hub device aggregates all match data into a PostgreSQL database
+  - Data is visualized with charts and tables on the data display page
+  - AI agent provides natural language insights and analysis
+  - All pages are interconnected with easy navigation
 
 structure:
   frc-qr-scouting-app/
-    frontend/
-      scouting_form.html   # Main UI for data entry and QR generation
     hub/
-      main.py              # Backend for data collection
-    certs/                 # HTTPS certificates (generated locally)
-      localhost.pem
-      localhost-key.pem
-    data/                  # Stored scouting data
+      main.py              # Flask backend server
+      templates/
+        frontend.html      # Scouting form with QR code generation
+        index.html         # QR scanner page for mobile devices
+        data_display.html  # Data visualization and AI query interface
+      certs/              # HTTPS certificates (generated locally)
+        localhost.pem
+        localhost-key.pem
     setup_certs.py        # Certificate generation script
+    scout_radioz.sql      # PostgreSQL database schema
     requirements.txt
     README.md
-    .gitignore
 
 features:
-  - Interactive reef image for scoring input by level
-  - Barge algae and processor count tracking
-  - QR code generation for fast offline data transfer
+  - **Scouting Form** (/frontend): Desktop-friendly data entry with QR code generation
+  - **QR Scanner** (/scanner): Mobile camera-based QR code scanning
+  - **Data Display** (/data-display): Interactive charts, data tables, and AI analysis
+  - Tracks autonomous, teleop, capabilities, and endgame performance
+  - PostgreSQL database for reliable data storage
+  - AI-powered natural language queries for match insights
+  - Real-time graphs showing fuel scoring and climb statistics
   - Offline-first design for competition environments
-  - Hub for data aggregation and export
+  - Cross-page navigation for easy workflow
 
 setup:
   1. Clone repository:
@@ -67,13 +74,25 @@ setup:
      - Configure Flask to use the certificates
      - Update .gitignore if needed
 
-  6. Run the application:
+  6. Setup PostgreSQL database:
+     - Install PostgreSQL if not already installed
+     - Create a database named 'scout_radioz'
+     - Import the schema:
+       psql -U postgres -d scout_radioz -f scout_radioz.sql
+     - Configure connection in hub/main.py
+
+  7. Run the application:
      Start the backend hub:
        python hub/main.py
-     
-     Access the scouting form:
-     - On hub device: https://localhost:5000
-     - On other devices: https://<hub-ip>:5000
+     , Chart.js, jsQR
+  backend: Python (Flask), psycopg2
+  storage: PostgreSQL database
+  qr_handling: 
+    - Generation: qrcodejs (frontend)
+    - Scanning: jsQR (client-side decoding)
+  ai: OpenAI API integration for natural language queries
+     - Data Display: https://localhost:5000/data-display
+     - On other devices: https://<hub-ip>:5000/
        (Accept the security certificate when prompted)
 
 tech_stack:
@@ -87,12 +106,41 @@ security_notes:
   https_certificates:
     - Certificates are required for HTTPS and camera access
     - Generated automatically by setup_certs.py using mkcert
-    - Stored in ./certs directory (not tracked by git)
-    - Never commit certificate files to the repository
-    - Files generated:
-        certs/localhost.pem
-        certs/localhost-key.pem
-    
+pages:
+  frontend (Scouting Form):
+    - Desktop/tablet-optimized data entry interface
+    - Tracks match number, team number, alliance color
+    - Records autonomous fuel and climb performance
+    - Teleop fuel scoring with quick +1/+5/+8 buttons
+    - Robot capabilities checkboxes (turret, trench, defense, passing)
+    - Endgame climb selection (L1/L2/L3)
+    - Notes field for qualitative observations
+    - Generates QR code with all match data
+    - Navigate to scanner or data display pages
+
+  scanner (QR Scanner):
+    - Mobile-optimized camera interface
+    - Client-side QR code decoding using jsQR
+    - Real-time scanning with visual feedback
+    - Automatic submission to database on successful scan
+    - Camera stop/start controls
+    - View list of recently scanned data
+    - Navigate to scouting form or data display pages
+
+  data_display (Data Display):
+    - Interactive data table showing all match records
+    - Bar charts for average fuel scoring by team
+    - Stacked bar charts for climb point analysis
+    - AI query interface for natural language questions
+    - Real-time data updates
+    - Navigate to scanner or scouting form pages
+
+gitignore:
+  - venv/
+  - __pycache__/
+  - hub/certs/
+  - *.pyc
+  - .env
   first_time_setup:
     - Run setup_certs.py to generate certificates
     - Accept the certificate in your browser
