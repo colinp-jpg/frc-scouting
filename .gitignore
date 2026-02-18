@@ -1,5 +1,3 @@
-reef.png
-reef_base64.txt
 mkcert-v1.4.4-linux-amd64
 # Certificate files and directories
 certs/
@@ -17,7 +15,6 @@ instance/
 *$py.class
 venv/
 .env
-scout_radioz.sql
 
 # Data directories (both repo and local)
 collected_data/

@@ -76,9 +76,8 @@ setup:
 
   6. Setup PostgreSQL database:
      - Install PostgreSQL if not already installed
-     - Create a database named 'scout_radioz'
-     - Import the schema:
-       psql -U postgres -d scout_radioz -f scout_radioz.sql
+     - Create a database
+     - Import the schema from schema.sql
      - Configure connection in hub/main.py
 
   7. Run the application:
