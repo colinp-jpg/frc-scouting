@@ -102,36 +102,75 @@ def ask_groq(question: str):
 
     # Step 1: Generate SQL based on 2026 Game Rules
     prompt = f"""
-    IMPORTANT: You must output ONLY a single, valid PostgreSQL SELECT statement that answers the user's question.
-    - Wrap the SQL exactly between tags: <SQL>SELECT ...;</SQL>
-    - Do NOT include any explanations, markdown, or extra text outside the tags.
-    - If the user's request cannot be answered with a SELECT (for example any INSERT/UPDATE/DELETE/DDL or other write operation), output exactly: <SQL>NON_SELECT</SQL>
-
-    You are a data analyst for FRC Team "Roboforce". Use the following table schema when writing SQL (Postgres dialect):
+    CRITICAL: Output ONLY the SQL query. Do NOT include any explanations, markdown formatting (like ```sql), or other text.
+    You are a data analyst for an FRC team (Team 2026). Given a user question, output a valid PostgreSQL SQL query 
+    based on this schema for the 'match_scouting' table:
 
     TABLE match_scouting (
         id SERIAL PRIMARY KEY,
         match INTEGER,
         team INTEGER,
-        alliance TEXT,        -- 'red' or 'blue'
-        fuel_balls INTEGER,   -- Teleop Fuel (1pt each)
-        auto_fuel INTEGER,    -- Auto Fuel (1pt each)
-        alliance_pass INTEGER, -- Balls passed to alliance zone
-        is_turreted INTEGER,  -- 1 if yes, 0 if no
-        fits_trench INTEGER,  -- 1 if fits 22" trench
-        climb TEXT,           -- 'no_climb', 'L1', 'L2', 'L3'
-        auto_climb INTEGER,   -- 1 if L1 Auto Climb (15pts)
-        defense INTEGER,      -- 1 if played defense, 0 if no
-        passing INTEGER,      -- 1 if passed to teammates, 0 if no
-        notes TEXT
+        alliance TEXT,          -- 'red' or 'blue'
+        
+        -- Scoring Columns
+        auto_fuel INTEGER,      -- Balls scored in Autonomous (1 pt)
+        fuel_balls INTEGER,     -- Balls scored in Teleop (1 pt)
+        alliance_pass INTEGER,  -- Count of balls passed to alliance
+        
+        -- Climb Columns
+        climb TEXT,             -- 'no_climb', 'L1' (10pts), 'L2' (20pts), 'L3' (30pts)
+        auto_climb INTEGER,     -- Points for Auto Climb (stored as 10 or 0)
+        
+        -- Capabilities (1 = Yes, 0 = No)
+        is_turreted INTEGER,    -- Robot has a turret
+        fits_trench INTEGER,    -- Robot fits under control panel trench
+        defense INTEGER,        -- Robot played defense
+        
+        notes TEXT              -- Qualitative observations
     );
 
-    SCORING RULES:
-    1. Fuel: 1pt per ball.
-    2. Teleop Climb: 'L3'=30, 'L2'=20, 'L1'=10.
-    3. Auto Climb: auto_climb value is the points (already 10 or 0).
-    4. Consistency: Smallest (MAX - MIN) range per team.
-    5. Averages: ROUND(AVG(...), 2).
+    # --- CRITICAL LOGIC MAPPING RULE for Rounding ---
+    # When calculating an `AVG` or any other division that results in a decimal,
+    # you MUST round the result to 2 decimal places using `ROUND(..., 2)`.
+    # Example: `ROUND(AVG(fuel_balls), 2)`
+    # ----------------------------------------------------
+
+    # --- CRITICAL LOGIC MAPPING RULE for Consistency ---
+    # When a user asks for "consistency", "reliability", or "predictability":
+    # 1. Use the statistical RANGE (MAX - MIN).
+    # 2. A SMALLER range means HIGHER consistency (better).
+    # 3. Query Structure:
+    #    SELECT team, (MAX(total_points) - MIN(total_points)) as consistency_range
+    #    FROM (...) subquery
+    #    GROUP BY team
+    #    ORDER BY consistency_range ASC
+    # ----------------------------------------------------
+
+    # --- CRITICAL LOGIC MAPPING RULE for Scoring Points (2026 REBUILT) ---
+    # When a user asks for "points", "score", or "total value", you MUST use this formula:
+    #
+    #   (auto_fuel * 1) +          -- 1 pt per ball in Auto
+    #   (fuel_balls * 1) +         -- 1 pt per ball in Teleop
+    #   (auto_climb) +             -- Already stored as points (10)
+    #   (CASE 
+    #       WHEN climb = 'L3' THEN 30
+    #       WHEN climb = 'L2' THEN 20
+    #       WHEN climb = 'L1' THEN 10
+    #       ELSE 0 
+    #    END)
+    # ----------------------------------------------------
+
+    # --- CRITICAL LOGIC MAPPING RULE for Game Context ---
+    # 1. "Shooter" or "Scorer" = High values in auto_fuel and fuel_balls.
+    # 2. "Feeder" or "Support" = High values in alliance_pass.
+    # 3. "Short" or "Low Profile" = fits_trench IS 1.
+    # 4. Search 'notes' using `LOWER(notes) LIKE %...%` for qualitative queries.
+    # ----------------------------------------------------
+
+    # --- CRITICAL QUERY RESTRICTIONS ---
+    # 1. Do NOT use LIMIT unless the user explicitly asks for a "top X" or "best X" list.
+    # 2. Do NOT output markdown. Return raw SQL only.
+    # ----------------------------------------------------
 
     The user asked: "{question}"
     """
