@@ -121,7 +121,6 @@
           <th>Auto Climb</th>
           <th>Fuel Balls</th>
           <th>Passed Balls</th>
-          <th>Passing</th>
           <th>Turreted</th>
           <th>Defense</th>
           <th>Trench</th>
@@ -134,7 +133,25 @@
     </table>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
+      // Initialize Socket.IO connection
+      const socket = io();
+
+      // Listen for data updates from server
+      socket.on('data_updated', function(data) {
+        console.log('Received data update notification:', data);
+        loadPageData(); // Refresh the data
+      });
+
+      socket.on('connect', function() {
+        console.log('Connected to server via WebSocket');
+      });
+
+      socket.on('disconnect', function() {
+        console.log('Disconnected from server');
+      });
+
       // Helper: format integer-based values into 'Yes' / 'No' for display
       function formatBoolDisplay(val) {
         // Handle numeric values (integers stored as 1/0 or 10/0)
@@ -190,7 +207,6 @@
             { key: 'auto_climb' },
             { key: 'fuel_balls' },
             { key: 'alliance_pass' },
-            { key: 'passing' },
             { key: 'is_turreted' },
             { key: 'defense' },
             { key: 'fits_trench' },
@@ -204,7 +220,7 @@
               if (val === null || val === undefined) val = '';
 
               // Normalize boolean-like fields for display as Yes/No
-              if (col.key === 'is_turreted' || col.key === 'auto_climb' || col.key === 'fits_trench' || col.key === 'defense' || col.key === 'passing') {
+              if (col.key === 'is_turreted' || col.key === 'auto_climb' || col.key === 'fits_trench' || col.key === 'defense') {
                 const boolLabel = formatBoolDisplay(val);
                 if (boolLabel !== '') val = boolLabel;
                 else val = '';

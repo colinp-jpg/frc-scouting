@@ -1,4 +1,5 @@
 from flask import Flask, request, render_template, jsonify
+from flask_socketio import SocketIO, emit
 import json
 from datetime import datetime
 import os
@@ -18,6 +19,8 @@ DB_URL = os.getenv("DATABASE_URL")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route('/')
 def frontend():
@@ -248,11 +251,7 @@ SQL Query: {sql_query}
 Results: {data}
 
 Provide a DATA-FOCUSED summary:
-1. Lead with specific numbers and stats
-2. Use bullet points or compact format
-3. Minimal explanation - let the numbers speak
-4. Include team numbers and their key metrics
-5. Keep it under 3 sentences or use a compact list format
+Keep it short and directly related to the data.
 
 Summary:"""
     print(f"[DEBUG] Sending summary prompt to Groq API: {summary_prompt}")
@@ -282,11 +281,11 @@ def insert_data_to_db(record: dict):
     INSERT INTO match_scouting (
         match, team, alliance, fuel_balls, auto_fuel, alliance_pass,
         is_turreted, fits_trench, climb, auto_climb, notes,
-        defense, passing
+        defense
     ) VALUES (
         %(match)s, %(team)s, %(alliance)s, %(fuel_balls)s, %(auto_fuel)s, %(alliance_pass)s,
         %(is_turreted)s, %(fits_trench)s, %(climb)s, %(auto_climb)s, %(notes)s,
-        %(defense)s, %(passing)s
+        %(defense)s
     )
     """
     conn = None
@@ -364,7 +363,7 @@ def submit_json():
         data['notes'] = ""  # Default to an empty string if 'notes' is missing
 
     # Convert all checkbox fields to boolean
-    checkbox_fields = ['is_turreted', 'defense', 'passing', 'fits_trench']
+    checkbox_fields = ['is_turreted', 'defense', 'fits_trench']
     for field in checkbox_fields:
         data[field] = bool(data.get(field, 0))
 
@@ -376,6 +375,10 @@ def submit_json():
 
     db_status = insert_data_to_db(data)
     print(f"[DEBUG] Database status: {db_status}")
+
+    # Emit socket event to notify all connected clients to refresh data
+    socketio.emit('data_updated', {'message': 'New data available'}, broadcast=True)
+    print("[DEBUG] Emitted data_updated event to all clients")
 
     return jsonify({
         "csv_status": csv_status,
@@ -433,7 +436,8 @@ def keep_db_alive():
         time.sleep(240)
 
 # Start ngrok when the application starts (for both dev and gunicorn)
-threading.Thread(target=start_ngrok, daemon=True).start()
+if os.environ.get('SERVER_SOFTWARE', '').startswith('gunicorn') or os.getpid() == os.getppid():
+    threading.Thread(target=start_ngrok, daemon=True).start()
 # Start database keep-alive
 threading.Thread(target=keep_db_alive, daemon=True).start()
 
@@ -442,4 +446,4 @@ if __name__ == '__main__':
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     # Bind to 127.0.0.1 for reliable localhost access (IPv4 only)
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    socketio.run(app, host='127.0.0.1', port=5000, debug=True)
