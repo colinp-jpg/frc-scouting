@@ -64,6 +64,13 @@ fi
 # Note: ngrok is started by the Flask application (via main.py's start_ngrok()). Do not start it here.
 echo "ℹ️  ngrok will be managed by the application (main.py)."
 
-# Run the Flask app via the module entrypoint (ensures __main__ code runs)
-echo "🚀 Launching Flask app (python -u -m hub.main)"
-exec python -u -m hub.main
+# Choose server mode: set USE_GUNICORN=1 to use gunicorn, otherwise use Flask dev server
+USE_GUNICORN="${USE_GUNICORN:-1}"
+
+if [ "$USE_GUNICORN" = "1" ]; then
+  echo "🚀 Launching Flask app with Gunicorn (production mode)"
+  exec gunicorn --bind 127.0.0.1:5000 --workers 4 --threads 2 --timeout 120 hub.main:app
+else
+  echo "🚀 Launching Flask app (development mode)"
+  exec python -u -m hub.main
+fi

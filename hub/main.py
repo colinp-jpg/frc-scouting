@@ -408,11 +408,10 @@ def start_ngrok():
     except Exception as e:
         print(f"Failed to start Ngrok: {e}")
 
-if __name__ == '__main__':
-    # Only start ngrok in the main process (not the reloader process)
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        threading.Thread(target=start_ngrok, daemon=True).start()
+# Start ngrok when the application starts (for both dev and gunicorn)
+threading.Thread(target=start_ngrok, daemon=True).start()
 
+if __name__ == '__main__':
     # Add this line to disable caching for development
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
