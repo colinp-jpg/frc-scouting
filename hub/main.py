@@ -240,8 +240,21 @@ def ask_groq(question: str):
         print(f"[ERROR] SQL query execution failed: {e}")
         return {"error": str(e), "query": sql_query}
 
-    # Step 3: Summarize results
-    summary_prompt = f"User asked: '{question}'. Results: {data}. Provide a simple and clear summary in plain English."
+    # Step 3: Summarize results with full context
+    summary_prompt = f"""You are analyzing FRC robotics scouting data.
+
+User Question: "{question}"
+SQL Query: {sql_query}
+Results: {data}
+
+Provide a DATA-FOCUSED summary:
+1. Lead with specific numbers and stats
+2. Use bullet points or compact format
+3. Minimal explanation - let the numbers speak
+4. Include team numbers and their key metrics
+5. Keep it under 3 sentences or use a compact list format
+
+Summary:"""
     print(f"[DEBUG] Sending summary prompt to Groq API: {summary_prompt}")
 
     try:
@@ -408,8 +421,21 @@ def start_ngrok():
     except Exception as e:
         print(f"Failed to start Ngrok: {e}")
 
+def keep_db_alive():
+    while True:
+        now = datetime.now()
+        # Only ping during competition hours (10am - 11pm)
+        if 10 <= now.hour < 23:
+            try:
+                run_sql_query("SELECT 1")
+            except:
+                pass
+        time.sleep(240)
+
 # Start ngrok when the application starts (for both dev and gunicorn)
 threading.Thread(target=start_ngrok, daemon=True).start()
+# Start database keep-alive
+threading.Thread(target=keep_db_alive, daemon=True).start()
 
 if __name__ == '__main__':
     # Add this line to disable caching for development
